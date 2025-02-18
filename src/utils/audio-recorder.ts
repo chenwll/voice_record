@@ -22,7 +22,9 @@ export class AudioRecorder {
                 }
             };
             this.mediaRecorder.start();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
+            console.error(e);
             // 此处异常一般都是没有权限导致，因此提示用户去浏览器设置页开启权限
             throw new Error('浏览器拒绝了录音权限，请去浏览器设置页开启权限');
         }
@@ -30,6 +32,7 @@ export class AudioRecorder {
 
     stop(): Promise<Blob> {
         return new Promise<Blob>(resolve => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-expressions
             this.mediaRecorder &&
             (this.mediaRecorder.onstop = async () => {
                 const blob = await getWaveBlob(this.recordedBlobs!, false, {sampleRate: 48000});
@@ -41,5 +44,23 @@ export class AudioRecorder {
             });
             this.mediaRecorder?.stop();
         });
+    }
+
+    // 暂停录音
+    pause() {
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.pause();
+        } else {
+            throw new Error('无法暂停，因为录音尚未开始或已暂停。');
+        }
+    }
+
+    // 恢复录音
+    resume() {
+        if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
+            this.mediaRecorder.resume();
+        } else {
+            throw new Error('无法恢复，因为录音尚未暂停。');
+        }
     }
 }

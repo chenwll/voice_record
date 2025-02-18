@@ -1,30 +1,40 @@
-/**
- * @file 创建语音组件的 hook
- * @author hejinfeng01
- */
-import {useRef, useState, useCallback, useEffect, useMemo, useRef} from 'react';
-import {message} from 'antd';
+import {useRef, useState, useCallback, useEffect, useMemo} from 'react';
+// import {message} from 'antd';
 import {AudioRecorder} from '../utils/audio-recorder';
 
-// tts 语音合成最小音频时长 10s，防止容易触发 10s 的临界值，这里设置为 11s
-export const MinRecordDuration = 11;
+// tts 语音合成最小音频时长 15s，防止容易触发 15s 的临界值，这里设置为 16s
+export const MinRecordDuration = 16;
 
 // tts 语音合成最大音频时长 60s，防止容易触发 60s 的临界值，这里设置为 59s
 export const MaxRecordDuration = 59;
 
-export const DefaultDescription = '请用自然的语气读完下面的句子';
 
 // 录音文本
 export const RecordText =
     '嘿，你知道吗？今天街上的人特别多，简直比平时热闹了好几倍。大家都忙着购物、吃饭，街上的每个角落都充满了欢声笑语。我也被这种热闹的氛围吸引，感觉真是不错！';
 
 export enum CreateAudioStatus {
+    // 初始
     NONE = 'none',
+    // 正在录音
     RECORDING = 'recording',
+    // 正在上传
     UPLOADING = 'uploading',
+    // 上传成功
     SUCCESS = 'success',
+    // 上传失败
     FAIL = 'fail',
+    // 暂停
+    PAUSE = 'pause',
 }
+
+export enum CreateAudioGuideText {
+    NONE = '点击开始朗读 或自由发挥',
+    RECORDING = '可点击暂停',
+    PAUSE = '可点击继续录制',
+}
+
+
 
 /**
  * @description
@@ -49,7 +59,7 @@ export default function useCreateAudio() {
     // 录音状态
     const [status, setStatus] = useState(CreateAudioStatus.NONE);
     // 录音过程的错误信息或者提示信息
-    const [description, setDescription] = useState<string>(DefaultDescription);
+    const [description, setDescription] = useState<string>(CreateAudioGuideText.NONE);
     // 记录录音时长的定时器
     const recordDurationIntervalRef = useRef<NodeJS.Timeout>(null);
     // 录音时长
@@ -67,31 +77,34 @@ export default function useCreateAudio() {
         try {
             await audioRecorder.start();
             setStatus(CreateAudioStatus.RECORDING);
-            setDescription(DefaultDescription);
+            setDescription(CreateAudioGuideText.RECORDING);
             setRecordDuration(0);
+            // eslint-disable-next-line @typescript-eslint/no-unused-expressions
             recordDurationIntervalRef.current && clearInterval(recordDurationIntervalRef.current);
             recordDurationIntervalRef.current = setInterval(() => {
                 setRecordDuration(prevState => prevState + 1);
             }, 1000);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             console.error(e);
-            message.error(e?.message);
+            // message.error(e?.message);
         }
     }, [audioRecorder]);
 
     // 停止录音
     const stopRecord = useCallback(() => {
         setRecordDuration(0);
+        setDescription(CreateAudioGuideText.NONE);
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         recordDurationIntervalRef.current && clearInterval(recordDurationIntervalRef.current);
         return audioRecorder.stop();
     }, [audioRecorder]);
 
-    // 重置数据
-    const reset = useCallback(() => {
-        setStatus(CreateAudioStatus.NONE);
-        setDescription(DefaultDescription);
-        stopRecord();
-    }, [stopRecord]);
+    // 重新录音
+    const resetRecord = useCallback(async() => {
+        await stopRecord();
+        await startRecord();
+    }, [startRecord, stopRecord]);
 
     // 达到最大录制时长时停止录音并设置为失败状态
     useEffect(() => {
@@ -102,12 +115,29 @@ export default function useCreateAudio() {
         }
     }, [recordDuration, stopRecord]);
 
+    // 暂停录音
+    const pausedRecord = useCallback(() => {
+        audioRecorder.pause();
+        setStatus(CreateAudioStatus.PAUSE);
+        setDescription(CreateAudioGuideText.PAUSE);
+        clearInterval(recordDurationIntervalRef.current);
+    }, [audioRecorder]);
+
+    // 继续录音
+    const resumeRecord = useCallback(() => {
+        audioRecorder.resume();
+        setStatus(CreateAudioStatus.RECORDING);
+        recordDurationIntervalRef.current = setInterval(() => {
+            setRecordDuration(prevState => prevState + 1);
+        }, 1000);
+    }, [audioRecorder]);
+
     // 卸载组件时重置数据并停止录音
     useEffect(
         () => () => {
-            reset();
+            stopRecord();
         },
-        [reset]
+        [stopRecord]
     );
 
     return {
@@ -118,7 +148,9 @@ export default function useCreateAudio() {
         setDescription,
         startRecord,
         stopRecord,
-        reset,
+        resetRecord,
         showCountdown,
+        pausedRecord,
+        resumeRecord
     };
 }
