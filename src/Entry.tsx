@@ -1,6 +1,6 @@
 import {memo, useState, useCallback} from 'react';
 import { Steps , Button} from 'antd-mobile'
-import useCreateAudio from './hooks/useCreateAudio';
+import useCreateAudio, { CreateAudioStatus, MinRecordDuration } from './hooks/useCreateAudio';
 import RecordAudio from './components/RecordAudio';
 const { Step } = Steps;
 const Entry = () => {
@@ -8,9 +8,9 @@ const Entry = () => {
 
     const {
         status,
-        // setStatus,
+        setStatus,
         description,
-        // setDescription,
+        setDescription,
         recordDuration,
         startRecord,
         stopRecord,
@@ -21,10 +21,28 @@ const Entry = () => {
         
     } = useCreateAudio();
 
-    const publishRecord = useCallback(() => {
-        console.log('发布录音');
-        setCurrentStep(2);
-    },[])
+    const publishRecord = useCallback(async () => {
+
+        if (recordDuration < MinRecordDuration && status === CreateAudioStatus.RECORDING) {
+            setStatus(CreateAudioStatus.FAIL);
+            setDescription('录制时间过短，请重新录制');
+            stopRecord();
+            return;
+        }
+
+        try {
+            const blob = await stopRecord();
+            const formData = new FormData();
+            formData.append('speechFile', new File([blob], 'speech.wav'));
+            setStatus(CreateAudioStatus.UPLOADING);
+            setCurrentStep(2);
+            console.log(formData, '文件数据')
+        } catch (e) {
+            setStatus(CreateAudioStatus.FAIL);
+            // message.error('录制失败，请重新录制');
+            setDescription('录制失败，请重新录制');
+        }
+    }, [recordDuration, status, setStatus, setDescription, stopRecord]);
 
     return (
         <div>
