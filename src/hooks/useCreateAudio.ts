@@ -1,5 +1,4 @@
 import {useRef, useState, useCallback, useEffect, useMemo} from 'react';
-// import {message} from 'antd';
 import {AudioRecorder} from '../utils/audio-recorder';
 
 // tts 语音合成最小音频时长 15s，防止容易触发 15s 的临界值，这里设置为 16s
@@ -117,10 +116,10 @@ export default function useCreateAudio() {
 
     // 暂停录音
     const pausedRecord = useCallback(() => {
-        audioRecorder.pause();
         setStatus(CreateAudioStatus.PAUSE);
         setDescription(CreateAudioGuideText.PAUSE);
-        clearInterval(recordDurationIntervalRef.current);
+        recordDurationIntervalRef.current && clearInterval(recordDurationIntervalRef.current);
+        return audioRecorder.pause();
     }, [audioRecorder]);
 
     // 继续录音
@@ -134,7 +133,7 @@ export default function useCreateAudio() {
 
     // 卸载组件时重置数据并停止录音
     useEffect(
-        () => () => {
+        () =>  {
             stopRecord();
         },
         [stopRecord]

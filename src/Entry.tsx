@@ -1,10 +1,11 @@
-import {memo, useState, useCallback} from 'react';
+import {memo, useState, useCallback, useEffect} from 'react';
 import { Steps , Button} from 'antd-mobile'
 import useCreateAudio, { CreateAudioStatus, MinRecordDuration } from './hooks/useCreateAudio';
 import RecordAudio from './components/RecordAudio';
 const { Step } = Steps;
 const Entry = () => {
     const [currentStep, setCurrentStep] = useState(0);
+    const [audioUrl, setAudioUrl] = useState('');
 
     const {
         status,
@@ -21,6 +22,15 @@ const Entry = () => {
         
     } = useCreateAudio();
 
+    // 清理音频 URL
+    useEffect(() => {
+        return () => {
+            if (audioUrl) {
+                URL.revokeObjectURL(audioUrl);
+            }
+        };
+    }, [audioUrl]);
+
     const publishRecord = useCallback(async () => {
 
         if (recordDuration < MinRecordDuration && status === CreateAudioStatus.RECORDING) {
@@ -32,6 +42,10 @@ const Entry = () => {
 
         try {
             const blob = await stopRecord();
+
+            const url = URL.createObjectURL(blob);
+            setAudioUrl(url);
+
             const formData = new FormData();
             formData.append('speechFile', new File([blob], 'speech.wav'));
             setStatus(CreateAudioStatus.UPLOADING);
@@ -43,6 +57,20 @@ const Entry = () => {
             setDescription('录制失败，请重新录制');
         }
     }, [recordDuration, status, setStatus, setDescription, stopRecord]);
+
+    const playAudio = useCallback(() => {
+        if (!audioUrl) return;
+
+        const audio = new Audio(audioUrl);
+        audio.play().catch(error => {
+            console.error('播放失败:', error);
+        });
+
+        audio.addEventListener('ended', () => {
+            URL.revokeObjectURL(audioUrl);
+            setAudioUrl('');
+        });
+    }, [audioUrl, setDescription]);
 
     return (
         <div>
@@ -91,6 +119,9 @@ const Entry = () => {
                         />
                     </div>
                 </div>
+            }
+            {
+                currentStep === 2 && <Button onClick={playAudio}>播放录音</Button>
             }
         </div>
     );
